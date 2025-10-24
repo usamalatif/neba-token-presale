@@ -5,16 +5,18 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 
 /**
  * @title VestingVault
  * @notice Manages token vesting with cliff and linear unlock schedules
  * @dev Handles multiple vesting schedules per beneficiary
  */
-contract VestingVault is ReentrancyGuard, AccessControl {
+contract VestingVault is ReentrancyGuard, AccessControl, Pausable {
     using SafeERC20 for IERC20;
     
     bytes32 public constant SALE_ROUND_ROLE = keccak256("SALE_ROUND_ROLE");
+    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     
     struct VestingSchedule {
         uint256 totalAmount;
@@ -40,6 +42,8 @@ contract VestingVault is ReentrancyGuard, AccessControl {
     );
     event TokensClaimed(address indexed beneficiary, uint256 amount);
     event SaleRoundAuthorized(address indexed saleRound);
+    event EmergencyPause(address indexed caller, uint256 timestamp);
+    event Unpause(address indexed caller, uint256 timestamp);
     
     modifier onlyAuthorized() {
         require(
@@ -58,6 +62,7 @@ contract VestingVault is ReentrancyGuard, AccessControl {
         token = IERC20(_token);
         // Grant admin role to deployer initially
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(PAUSER_ROLE, msg.sender);  // Grant pauser role to deployer
     }
     
     /**
@@ -71,10 +76,26 @@ contract VestingVault is ReentrancyGuard, AccessControl {
         saleManager = _saleManager;
         _initialized = true;
         
-        // Grant admin role to sale manager so it can authorize rounds
-        _grantRole(DEFAULT_ADMIN_ROLE, _saleManager);
+        // Note: SaleManager role assignment is handled in deployment script
+        // to avoid giving SaleManager admin privileges over VestingVault
         
         emit SaleRoundAuthorized(_saleManager);
+    }
+    
+    /**
+     * @notice Pause the contract (emergency only)
+     */
+    function pause() external onlyRole(PAUSER_ROLE) {
+        _pause();
+        emit EmergencyPause(msg.sender, block.timestamp);
+    }
+    
+    /**
+     * @notice Unpause the contract
+     */
+    function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _unpause();
+        emit Unpause(msg.sender, block.timestamp);
     }
     
     /**
@@ -123,7 +144,7 @@ contract VestingVault is ReentrancyGuard, AccessControl {
     /**
      * @notice Claim all vested tokens for the caller
      */
-    function claimVested() external nonReentrant {
+    function claimVested() external nonReentrant whenNotPaused {
         uint256 claimable = getClaimableAmount(msg.sender);
         require(claimable > 0, "VestingVault: nothing to claim");
 
@@ -186,8 +207,9 @@ contract VestingVault is ReentrancyGuard, AccessControl {
         for (uint256 i = 0; i < schedules.length; i++) {
             VestingSchedule memory schedule = schedules[i];
 
+            
             if (block.timestamp < schedule.cliffEnd) {
-                return 0;
+                continue;  // Skip to next schedule instead of returning 0
             }
 
             uint256 vested = _calculateVestedAmount(schedule);

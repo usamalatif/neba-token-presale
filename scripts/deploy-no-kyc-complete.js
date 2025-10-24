@@ -7,9 +7,11 @@ async function main() {
   console.log("Deploying with account:", deployer.address);
   console.log("Balance:", hre.ethers.formatEther(await deployer.provider.getBalance(deployer.address)), "ETH\n");
 
-  // Multisig address
-  const multisigAddress = "0xF5D2Cc2202Dd9Bf51D87419aD630e195F724d12C";
-  console.log("Multisig address:", multisigAddress);
+  // Multisig addresses
+  const primaryMultisigAddress = "0xF5D2Cc2202Dd9Bf51D87419aD630e195F724d12C";
+  const secondaryMultisigAddress = "0x0000000000000000000000000000000000000000"; // TODO: Set your secondary multisig address
+  console.log("Primary multisig address:", primaryMultisigAddress);
+  console.log("Secondary multisig address:", secondaryMultisigAddress);
 
   // Step 1: Use existing contracts
   console.log("📦 Step 1: Using existing contracts...");
@@ -31,17 +33,17 @@ async function main() {
   console.log("\n🏗️ Step 2: Deploying infrastructure contracts...");
   
   const KYCRegistry = await hre.ethers.getContractFactory("KYCRegistry");
-  const kycRegistry = await KYCRegistry.deploy(multisigAddress);
+  const kycRegistry = await KYCRegistry.deploy(primaryMultisigAddress);
   await kycRegistry.waitForDeployment();
   console.log("✅ KYCRegistry deployed at:", await kycRegistry.getAddress());
   
   const RateLimiter = await hre.ethers.getContractFactory("RateLimiter");
-  const rateLimiter = await RateLimiter.deploy(multisigAddress);
+  const rateLimiter = await RateLimiter.deploy(primaryMultisigAddress);
   await rateLimiter.waitForDeployment();
   console.log("✅ RateLimiter deployed at:", await rateLimiter.getAddress());
   
   const FundsVault = await hre.ethers.getContractFactory("FundsVault");
-  const fundsVault = await FundsVault.deploy(multisigAddress);
+  const fundsVault = await FundsVault.deploy(primaryMultisigAddress, secondaryMultisigAddress);
   await fundsVault.waitForDeployment();
   console.log("✅ FundsVault deployed at:", await fundsVault.getAddress());
   
@@ -63,7 +65,7 @@ async function main() {
     usdcAddress,
     usdtAddress,
     oracleAddress,
-    multisigAddress
+    primaryMultisigAddress
   );
   await saleManager.waitForDeployment();
   console.log("✅ SaleManager deployed at:", await saleManager.getAddress());
@@ -115,7 +117,10 @@ async function main() {
   await rateLimiter.grantRole(saleRoundRole, roundAddress);
   console.log("✅ SaleRound granted SALE_ROUND_ROLE in RateLimiter");
   
-  // Grant SALE_ROUND_ROLE to SaleRound in VestingVault
+  await saleManager.authorizeSaleRound(0);
+  console.log("✅ SaleRound authorized in SaleManager (ReferralSystem role granted)");
+  
+  // Grant SALE_ROUND_ROLE to SaleRound in VestingVault (direct assignment for security)
   const vestingRole = await vestingVault.SALE_ROUND_ROLE();
   await vestingVault.grantRole(vestingRole, roundAddress);
   console.log("✅ SaleRound granted SALE_ROUND_ROLE in VestingVault");
@@ -123,7 +128,7 @@ async function main() {
   // Authorize SaleRound as depositor in FundsVault
   await fundsVault.authorizeDepositor(roundAddress);
   console.log("✅ SaleRound authorized as depositor in FundsVault");
-
+  
   // Step 7: Enable no-KYC mode
   console.log("\n🚀 Step 7: Enabling no-KYC mode...");
   
@@ -170,7 +175,8 @@ async function main() {
   const deploymentInfo = {
     network: hre.network.name,
     deployer: deployer.address,
-    multisig: multisigAddress,
+    primaryMultisig: primaryMultisigAddress,
+    secondaryMultisig: secondaryMultisigAddress,
     contracts: {
       nebaToken: nebaTokenAddress,
       kycRegistry: await kycRegistry.getAddress(),

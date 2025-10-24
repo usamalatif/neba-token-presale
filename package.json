@@ -24,6 +24,11 @@
     "test:gas-optimized": "hardhat run scripts/test-gas-optimized.js --network baseSepolia",
     "deploy:no-kyc-complete": "hardhat run scripts/deploy-no-kyc-complete.js --network baseSepolia",
     "resume:deployment": "hardhat run scripts/resume-deployment.js --network baseSepolia",
+    "test:circuit-breaker": "hardhat run scripts/test-circuit-breaker.js --network baseSepolia",
+    "test:race-condition": "hardhat run scripts/test-race-condition-fix.js --network baseSepolia",
+    "test:vesting-fix": "hardhat run scripts/test-vesting-fix.js --network baseSepolia",
+    "test:pause-mechanism": "hardhat run scripts/test-pause-mechanism.js --network baseSepolia",
+    "test:secondary-multisig": "hardhat run scripts/test-secondary-multisig.js --network baseSepolia",
     "node": "hardhat node",
     "clean": "hardhat clean"
   },

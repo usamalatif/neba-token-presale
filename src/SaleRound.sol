@@ -52,6 +52,11 @@ contract SaleRound is ReentrancyGuard, Pausable {
     uint256 private constant MIN_PRICE = 1000e8; // $1,000 minimum (adjust based on asset)
     uint256 private constant MAX_PRICE = 10000e8; // $10,000 maximum (adjust based on asset)
     
+    // Circuit breaker for price protection
+    uint256 public lastValidETHPrice;
+    uint256 public lastPriceUpdateTime;
+    uint256 public constant MAX_PRICE_CHANGE_PERCENT = 10; // 10% max change per hour
+    
     uint256 public totalRaisedUSD; // Total raised in USD (6 decimals)
     uint256 public totalTokensSold; // Total tokens sold (18 decimals)
     
@@ -88,6 +93,7 @@ contract SaleRound is ReentrancyGuard, Pausable {
         uint256 currentSpent,
         uint256 dailyCap
     );
+    event CircuitBreakerTriggered(uint256 oldPrice, uint256 newPrice, uint256 percentChange);
     
     modifier onlyManager() {
         require(msg.sender == manager, "SaleRound: not manager");
@@ -149,6 +155,7 @@ contract SaleRound is ReentrancyGuard, Pausable {
      * @param referrer Address of referrer (use address(0) if no referrer)
      */
     function buyWithUSDC(uint256 usdcAmount, address referrer) external nonReentrant whenNotPaused roundActive {
+        require(usdcAmount > 0, "SaleRound: zero USDC amount");
         uint256 usdValue = usdcAmount; // USDC has 6 decimals, same as our USD representation
         _checkEligibility(msg.sender, usdValue);
         
@@ -168,6 +175,7 @@ contract SaleRound is ReentrancyGuard, Pausable {
      * @param referrer Address of referrer (use address(0) if no referrer)
      */
     function buyWithUSDCNoKYC(uint256 usdcAmount, address referrer) external nonReentrant whenNotPaused roundActive {
+        require(usdcAmount > 0, "SaleRound: zero USDC amount");
         uint256 usdValue = usdcAmount; // USDC has 6 decimals, same as our USD representation
         _checkNoKYCEligibility(msg.sender, usdValue);
         
@@ -187,6 +195,7 @@ contract SaleRound is ReentrancyGuard, Pausable {
      * @param referrer Address of referrer (use address(0) if no referrer)
      */
     function buyWithUSDT(uint256 usdtAmount, address referrer) external nonReentrant whenNotPaused roundActive {
+        require(usdtAmount > 0, "SaleRound: zero USDT amount");
         uint256 usdValue = usdtAmount; // USDT has 6 decimals, same as our USD representation
         _checkEligibility(msg.sender, usdValue);
         
@@ -206,6 +215,7 @@ contract SaleRound is ReentrancyGuard, Pausable {
      * @param referrer Address of referrer (use address(0) if no referrer)
      */
     function buyWithUSDTNoKYC(uint256 usdtAmount, address referrer) external nonReentrant whenNotPaused roundActive {
+        require(usdtAmount > 0, "SaleRound: zero USDT amount");
         uint256 usdValue = usdtAmount; // USDT has 6 decimals, same as our USD representation
         _checkNoKYCEligibility(msg.sender, usdValue);
         
@@ -279,6 +289,15 @@ contract SaleRound is ReentrancyGuard, Pausable {
         require(_oracle != address(0), "SaleRound: zero address");
         ethUSDOracle = _oracle;
         emit OracleUpdated(_oracle);
+    }
+    
+    /**
+     * @notice Reset circuit breaker (manager only)
+     * @dev Use this when legitimate price movements occur
+     */
+    function resetCircuitBreaker() external onlyManager {
+        lastValidETHPrice = 0;
+        lastPriceUpdateTime = 0;
     }
     
     /**
@@ -382,12 +401,14 @@ contract SaleRound is ReentrancyGuard, Pausable {
         uint256 tokenAmount,
         address referrer
     ) private {
-        require(totalRaisedUSD + usdValue <= config.hardCapUSD, "SaleRound: exceeds hard cap");
-        
+        // Update state first to prevent race conditions
         contributions[buyer] += usdValue;
         tokenAllocations[buyer] += tokenAmount;
         totalRaisedUSD += usdValue;
         totalTokensSold += tokenAmount;
+        
+        // Check hard cap AFTER updating state to prevent race conditions
+        require(totalRaisedUSD <= config.hardCapUSD, "SaleRound: exceeds hard cap");
         
         // Handle referral bonus
         uint256 totalTokensToVest = tokenAmount;
@@ -448,12 +469,14 @@ contract SaleRound is ReentrancyGuard, Pausable {
         uint256 tokenAmount,
         address referrer
     ) private {
-        require(totalRaisedUSD + usdValue <= config.hardCapUSD, "SaleRound: exceeds hard cap");
-        
+        // Update state first to prevent race conditions
         contributions[buyer] += usdValue;
         tokenAllocations[buyer] += tokenAmount;
         totalRaisedUSD += usdValue;
         totalTokensSold += tokenAmount;
+        
+        // Check hard cap AFTER updating state to prevent race conditions
+        require(totalRaisedUSD <= config.hardCapUSD, "SaleRound: exceeds hard cap");
         
         // Handle referral bonus (same as regular purchase)
         uint256 totalTokensToVest = tokenAmount;
@@ -520,7 +543,7 @@ contract SaleRound is ReentrancyGuard, Pausable {
      * @dev Get ETH price from oracle
      * @return uint256 ETH price in USD with 6 decimals
      */
-    function _getETHPrice() private view returns (uint256) {
+    function _getETHPrice() private returns (uint256) {
         // In production, this would call a Chainlink oracle
         // For now, we'll use a simple interface
         (bool success, bytes memory data) = ethUSDOracle.staticcall(
@@ -544,7 +567,25 @@ contract SaleRound is ReentrancyGuard, Pausable {
         require(uint256(price) >= MIN_PRICE && uint256(price) <= MAX_PRICE, "SaleRound: price out of bounds");
 
         // Chainlink ETH/USD has 8 decimals, we need 6
-        return uint256(price) / 100;
+        uint256 newPrice = uint256(price) / 100;
+        
+        // Circuit breaker: Check for extreme price movements
+        if (lastValidETHPrice > 0 && block.timestamp - lastPriceUpdateTime < 1 hours) {
+            uint256 priceDiff = newPrice > lastValidETHPrice 
+                ? newPrice - lastValidETHPrice 
+                : lastValidETHPrice - newPrice;
+            uint256 percentChange = (priceDiff * 100) / lastValidETHPrice;
+            
+            if (percentChange > MAX_PRICE_CHANGE_PERCENT) {
+                emit CircuitBreakerTriggered(lastValidETHPrice, newPrice, percentChange);
+                revert("SaleRound: price change too extreme");
+            }
+        }
+        
+        lastValidETHPrice = newPrice;
+        lastPriceUpdateTime = block.timestamp;
+        
+        return newPrice;
     }
 }
 

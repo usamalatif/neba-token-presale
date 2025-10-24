@@ -87,6 +87,7 @@ contract SaleManager is Ownable, Pausable {
         // Also grant role to the initialOwner
         referralSystem.grantRole(referralSystem.DEFAULT_ADMIN_ROLE(), initialOwner);
         referralSystem.grantRole(referralSystem.REFERRAL_ADMIN_ROLE(), initialOwner);
+        
     }
     
     /**
@@ -131,10 +132,8 @@ contract SaleManager is Ownable, Pausable {
         bytes32 REFERRAL_SALE_ROUND_ROLE = referralSystem.SALE_ROUND_ROLE();
         referralSystem.grantRole(REFERRAL_SALE_ROUND_ROLE, roundAddress);
         
-        // Grant SALE_ROUND_ROLE in VestingVault
-        VestingVault vesting = VestingVault(vestingVault);
-        bytes32 VESTING_SALE_ROUND_ROLE = vesting.SALE_ROUND_ROLE();
-        vesting.grantRole(VESTING_SALE_ROUND_ROLE, roundAddress);
+        // Note: VestingVault role assignment is handled in deployment script
+        // to avoid giving SaleManager admin privileges over VestingVault
     }
     
     /**

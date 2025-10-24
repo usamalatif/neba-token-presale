@@ -13,7 +13,11 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 contract FundsVault is ReentrancyGuard {
     using SafeERC20 for IERC20;
     
-    address public immutable multisig;
+    address public immutable primaryMultisig;
+    address public secondaryMultisig;
+    uint256 public constant SECONDARY_DELAY = 7 days;
+    uint256 public secondaryMultisigActiveTime;
+    
     mapping(address => bool) public authorizedDepositors;
     
     event ETHDeposited(address indexed from, uint256 amount);
@@ -22,9 +26,15 @@ contract FundsVault is ReentrancyGuard {
     event TokenWithdrawn(address indexed token, address indexed to, uint256 amount);
     event DepositorAuthorized(address indexed depositor);
     event DepositorRevoked(address indexed depositor);
+    event SecondaryMultisigActivated(uint256 activationTime);
+    event SecondaryMultisigUpdated(address indexed oldSecondary, address indexed newSecondary);
     
     modifier onlyMultisig() {
-        require(msg.sender == multisig, "FundsVault: not multisig");
+        require(
+            msg.sender == primaryMultisig || 
+            (msg.sender == secondaryMultisig && block.timestamp >= secondaryMultisigActiveTime),
+            "FundsVault: not authorized"
+        );
         _;
     }
     
@@ -34,12 +44,50 @@ contract FundsVault is ReentrancyGuard {
     }
     
     /**
-     * @dev Constructor sets the multisig address
-     * @param _multisig Address of the multisig wallet
+     * @dev Constructor sets the primary and secondary multisig addresses
+     * @param _primaryMultisig Address of the primary multisig wallet
+     * @param _secondaryMultisig Address of the secondary multisig wallet
      */
-    constructor(address _multisig) {
-        require(_multisig != address(0), "FundsVault: zero address");
-        multisig = _multisig;
+    constructor(address _primaryMultisig, address _secondaryMultisig) {
+        require(_primaryMultisig != address(0), "FundsVault: zero primary address");
+        require(_secondaryMultisig != address(0), "FundsVault: zero secondary address");
+        require(_primaryMultisig != _secondaryMultisig, "FundsVault: same addresses");
+        primaryMultisig = _primaryMultisig;
+        secondaryMultisig = _secondaryMultisig;
+    }
+    
+    /**
+     * @notice Activate secondary multisig (emergency recovery)
+     * @dev Only primary multisig can activate secondary with 7-day delay
+     */
+    function activateSecondaryMultisig() external {
+        require(msg.sender == primaryMultisig, "FundsVault: only primary");
+        secondaryMultisigActiveTime = block.timestamp + SECONDARY_DELAY;
+        emit SecondaryMultisigActivated(secondaryMultisigActiveTime);
+    }
+    
+    /**
+     * @notice Update secondary multisig address (primary multisig only)
+     * @param _newSecondaryMultisig New secondary multisig address
+     */
+    function updateSecondaryMultisig(address _newSecondaryMultisig) external {
+        require(msg.sender == primaryMultisig, "FundsVault: only primary");
+        require(_newSecondaryMultisig != address(0), "FundsVault: zero address");
+        require(_newSecondaryMultisig != primaryMultisig, "FundsVault: same as primary");
+        
+        address oldSecondary = secondaryMultisig;
+        secondaryMultisig = _newSecondaryMultisig;
+        secondaryMultisigActiveTime = 0; // Reset activation time
+        
+        emit SecondaryMultisigUpdated(oldSecondary, _newSecondaryMultisig);
+    }
+    
+    /**
+     * @notice Check if secondary multisig is active
+     * @return bool True if secondary multisig can be used
+     */
+    function isSecondaryMultisigActive() external view returns (bool) {
+        return block.timestamp >= secondaryMultisigActiveTime && secondaryMultisigActiveTime > 0;
     }
     
     /**
