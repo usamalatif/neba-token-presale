@@ -1,0 +1,26 @@
+{
+  "network": "baseSepolia",
+  "chainId": "11155111",
+  "deployer": "0xF5D2Cc2202Dd9Bf51D87419aD630e195F724d12C",
+  "multisig": "0xF5D2Cc2202Dd9Bf51D87419aD630e195F724d12C",
+  "timestamp": "2025-10-23T17:29:13.877Z",
+  "contracts": {
+    "NEBAToken": "0x1175294Cf3BC254288C2Ed13326fD515c2b9Db1a",
+    "KYCRegistry": "0x5Ae998bfBE395bd27F6aBCFBd6F8Bf383eedc82c",
+    "RateLimiter": "0x67cfcAdF2d06aAccB12e9F305d9f1C9063C07aEC",
+    "FundsVault": "0xED12cC985F87e219D0087ce4fE6141a2B470a861",
+    "VestingVault": "0x01c9DfCB7497792B928F2FE90523a05DE6e6E4C0",
+    "SaleManager": "0xA8C1ebacb854f226f11894a834574172fC0CA868",
+    "ReferralSystem": "0x4035fFE1F0a9a39C9219728AA2166199bF904030"
+  },
+  "rounds": [
+    {
+      "index": "0",
+      "name": "Private Sale",
+      "address": "0x0C0253eE6eE6B61E79eC65b64F860283cB0e6990",
+      "tokenPrice": "$0.05",
+      "hardCap": "$500,000",
+      "createdAt": "2025-10-23T17:33:23.940Z"
+    }
+  ]
+}

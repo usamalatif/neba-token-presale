@@ -1,0 +1,136 @@
+Starting NEBA Presale deployment...
+
+Deploying contracts with account: 0xF5D2Cc2202Dd9Bf51D87419aD630e195F724d12C
+Account balance: 42318133945560147 
+
+Multisig address: 0xF5D2Cc2202Dd9Bf51D87419aD630e195F724d12C
+NEBA Token address: 0x1175294Cf3BC254288C2Ed13326fD515c2b9Db1a 
+
+🧪 Using testnet configuration (mock tokens and oracle)
+USDC: 0xfc8Bf89bd7c6AE520BEDacE38140a9aF203458E6
+USDT: 0x92E564DA3870a300de0C45971aD82A7dFC963E1a
+ETH/USD Oracle: 0x694AA1769357215DE4FAC081bf1f309aDC325306 
+
+=== Deploying KYC Registry ===
+KYC Registry deployed at: 0x5Ae998bfBE395bd27F6aBCFBd6F8Bf383eedc82c 
+
+=== Deploying Rate Limiter ===
+Rate Limiter deployed at: 0x67cfcAdF2d06aAccB12e9F305d9f1C9063C07aEC 
+
+=== Deploying Funds Vault ===
+Funds Vault deployed at: 0xED12cC985F87e219D0087ce4fE6141a2B470a861 
+
+=== Deploying Sale Manager (temporary) ===
+Sale Manager (temp) deployed at: 0xA8C1ebacb854f226f11894a834574172fC0CA868 
+
+=== Deploying Vesting Vault ===
+Vesting Vault deployed at: 0x01c9DfCB7497792B928F2FE90523a05DE6e6E4C0 
+
+=== Initializing Vesting Vault ===
+Vesting Vault initialized with Sale Manager
+
+=== Deployment Summary ===
+NEBA Token (existing): 0x1175294Cf3BC254288C2Ed13326fD515c2b9Db1a
+KYC Registry: 0x5Ae998bfBE395bd27F6aBCFBd6F8Bf383eedc82c
+Rate Limiter: 0x67cfcAdF2d06aAccB12e9F305d9f1C9063C07aEC
+Funds Vault: 0xED12cC985F87e219D0087ce4fE6141a2B470a861
+Vesting Vault: 0x01c9DfCB7497792B928F2FE90523a05DE6e6E4C0
+Sale Manager: 0xA8C1ebacb854f226f11894a834574172fC0CA868
+
+Deployment info saved to deployments-baseSepolia.json
+Deployment addresses saved to deployments-baseSepolia.env
+
+=== Next Steps ===
+1. Transfer NEBA tokens to VestingVault for distribution:
+   - VestingVault address: 0x01c9DfCB7497792B928F2FE90523a05DE6e6E4C0
+   - Recommended amount: 300M tokens for presale
+   - From your NEBA token contract, call: transfer(vestingVaultAddress, amount)
+
+2. Verify contracts on Basescan:
+   npm run verify:all
+
+3. Create sale rounds:
+   npm run create-rounds
+
+4. Add KYC whitelist:
+   node scripts/manage-kyc.js add <address>
+
+5. Authorize sale rounds as depositors in FundsVault (from multisig)
+
+
+
+
+usamalatif@192 presale-contracts-neba-main % npx hardhat run scripts/create-private-sale.js --network baseSepolia
+WARNING: You are currently using Node.js v23.6.0, which is not supported by Hardhat. This can lead to unexpected behavior. See https://hardhat.org/nodejs-versions
+
+
+=== Creating Private Sale Round ===
+
+Creating round with account: 0xF5D2Cc2202Dd9Bf51D87419aD630e195F724d12C
+Sale Manager: 0xA8C1ebacb854f226f11894a834574172fC0CA868
+Network: baseSepolia 
+
+SaleManager Owner: 0xF5D2Cc2202Dd9Bf51D87419aD630e195F724d12C
+Your Account: 0xF5D2Cc2202Dd9Bf51D87419aD630e195F724d12C
+✅ You are the owner!
+
+Private Sale Round Configuration:
+─────────────────────────────────────
+  Name: Private Sale
+  Token Price: $0.05 USD
+  Hard Cap: $500,000 USD
+  Start: 10/23/2025, 10:33:08 PM
+  End: 11/22/2025, 10:33:08 PM
+  Cliff Period: 6 months (180 days)
+  Vesting Period: 12 months (365 days)
+  Status: Active
+─────────────────────────────────────
+
+Creating Private Sale round...
+✅ Transaction sent: 0xd3550698d1d99d9421c972084c71e610f2ee299a11d75565d32e02856d25585c
+⏳ Waiting for confirmation...
+
+✅ Transaction confirmed!
+   Block: 9474437
+   Gas used: 2881818 
+
+🎉 Private Sale Round Created Successfully!
+═══════════════════════════════════════════════
+  Round Index: 0
+  Round Address: 0x0C0253eE6eE6B61E79eC65b64F860283cB0e6990
+═══════════════════════════════════════════════
+
+📍 View on Basescan:
+   https://sepolia.basescan.org/address/0x0C0253eE6eE6B61E79eC65b64F860283cB0e6990
+
+🎁 Referral System:
+   Address: 0x4035fFE1F0a9a39C9219728AA2166199bF904030
+   Referrer Bonus: 5%
+   Referee Bonus: 5%
+
+✅ Deployment file updated
+
+═══════════════════════════════════════════════
+         🚀 NEXT STEPS - IMPORTANT!
+═══════════════════════════════════════════════
+
+1️⃣ Authorize Round in FundsVault:
+   Contract: 0xED12cC985F87e219D0087ce4fE6141a2B470a861
+   Function: authorizeDepositor(address)
+   Parameter: 0x0C0253eE6eE6B61E79eC65b64F860283cB0e6990
+   Or run: node scripts/authorize-round.js 0 
+
+2️⃣ Grant SALE_ROUND_ROLE in RateLimiter:
+   Contract: 0x67cfcAdF2d06aAccB12e9F305d9f1C9063C07aEC
+   Get role: SALE_ROUND_ROLE()
+   Function: grantRole(bytes32, address)
+   Parameters: SALE_ROUND_ROLE, 0x0C0253eE6eE6B61E79eC65b64F860283cB0e6990 
+
+3️⃣ Add KYC Whitelist:
+   node scripts/manage-kyc.js add <user_address>
+
+4️⃣ Test Purchase:
+   - User must be KYC approved
+   - Approve USDC/USDT
+   - Call buyWithUSDC(amount, referrerAddress)
+usamalatif@192 presale-contracts-neba-main % 
